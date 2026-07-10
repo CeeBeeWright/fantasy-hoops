@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fantasy Hoops</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#12213D;
+    --navy-deep:#0A1526;
+    --navy-line: rgba(245,243,237,0.14);
+    --cream:#F5F2EA;
+    --cream-dim:#C9C4B6;
+    --orange:#E8722C;
+    --orange-dim: rgba(232,114,44,0.18);
+    --gold:#F0A93A;
+    --green:#3E8E67;
+    --red:#D14B3B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--navy-deep);
+    background-image:
+      radial-gradient(circle at 15% -10%, rgba(232,114,44,0.10), transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(240,169,58,0.08), transparent 45%);
+    color: var(--cream);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display{ font-family:'Anton', sans-serif; letter-spacing:0.02em; text-transform:uppercase; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  #app{ max-width: 920px; margin: 0 auto; padding: 28px 20px 80px; }
+  a{color:inherit;}
+
+  /* ---------- shared bits ---------- */
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px; letter-spacing:0.16em; text-transform:uppercase;
+    color: var(--orange); margin:0 0 6px;
+  }
+  .btn{
+    font-family:'Inter',sans-serif; font-weight:700; font-size:14px;
+    border:none; border-radius:3px; padding:12px 20px; cursor:pointer;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--orange); color: var(--navy-deep); }
+  .btn-primary:hover{ filter: brightness(1.08); }
+  .btn-ghost{ background: transparent; color: var(--cream); border:1px solid var(--navy-line); }
+  .btn-ghost:hover{ border-color: var(--orange); color: var(--orange); }
+  .btn-danger{ background: transparent; color: var(--red); border:1px solid rgba(209,75,59,0.4); }
+  .btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  input, select, textarea{
+    font-family:'Inter',sans-serif; font-size:14px; color: var(--cream);
+    background: rgba(245,242,234,0.05); border:1px solid var(--navy-line);
+    border-radius:3px; padding:10px 12px; width:100%;
+  }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color: var(--orange); }
+  label{ font-size:12px; color: var(--cream-dim); display:block; margin-bottom:6px; font-weight:600;}
+  .field{ margin-bottom:16px; }
+  .card{
+    background: rgba(245,242,234,0.035);
+    border:1px solid var(--navy-line);
+    border-radius:6px; padding:22px;
+  }
+  .hr{ height:1px; background: var(--navy-line); margin: 22px 0; }
+  .row{ display:flex; gap:12px; align-items:center; }
+  .between{ justify-content:space-between; }
+  .wrap{ flex-wrap:wrap; }
+  .muted{ color: var(--cream-dim); font-size:13px; }
+  .pill{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    padding:3px 9px; border-radius:20px; border:1px solid var(--navy-line); color:var(--cream-dim);
+  }
+  .pill-live{ border-color: var(--orange); color: var(--orange); }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background: var(--cream); color: var(--navy-deep); font-weight:600; font-size:13px;
+    padding:12px 20px; border-radius:4px; box-shadow:0 10px 30px rgba(0,0,0,0.4);
+    opacity:0; pointer-events:none; transition: opacity .2s ease, bottom .2s ease; z-index:50;
+  }
+  .toast.show{ opacity:1; bottom:32px; }
+
+  /* ---------- header / scoreboard ---------- */
+  .scorebug{
+    border:1px solid var(--navy-line); border-radius:6px;
+    background: linear-gradient(180deg, rgba(245,242,234,0.05), rgba(245,242,234,0.01));
+    padding:18px 22px; margin-bottom:22px;
+  }
+  .scorebug h1{ font-size:30px; margin:0; }
+  .code-badge{
+    font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:13px;
+    background: var(--orange-dim); color: var(--orange); border:1px dashed var(--orange);
+    padding:4px 10px; border-radius:3px; letter-spacing:0.08em; cursor:pointer;
+  }
+
+  /* ---------- tabs ---------- */
+  .tabs{ display:flex; gap:4px; margin-bottom:22px; border-bottom:1px solid var(--navy-line); overflow-x:auto; }
+  .tab{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:12px 16px; cursor:pointer; color: var(--cream-dim); border-bottom:2px solid transparent;
+    white-space:nowrap;
+  }
+  .tab.active{ color: var(--orange); border-color: var(--orange); }
+
+  /* ---------- draft ticket board (signature element) ---------- */
+  .clock{
+    border:2px solid var(--orange); border-radius:6px; padding:16px 20px;
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;
+    background: rgba(232,114,44,0.06);
+    position:relative;
+  }
+  .clock::before, .clock::after{
+    content:""; position:absolute; width:14px; height:14px; border-color:var(--orange); border-style:solid;
+  }
+  .clock::before{ top:-2px; left:-2px; border-width:2px 0 0 2px; }
+  .clock::after{ bottom:-2px; right:-2px; border-width:0 2px 2px 0; }
+  .clock .onclock{ font-size:22px; }
+  .ticket-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:10px; }
+  .ticket{
+    border:1px solid var(--navy-line); border-left:3px solid var(--orange);
+    border-radius:3px; padding:10px 12px; background: rgba(245,242,234,0.03);
+  }
+  .ticket .pk{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--orange); }
+  .ticket .pname{ font-weight:700; font-size:14px; margin:3px 0 1px; }
+  .ticket .pteam{ font-size:11px; color:var(--cream-dim); }
+  .ticket .pby{ font-size:10px; color:var(--cream-dim); margin-top:6px; font-family:'IBM Plex Mono',monospace; }
+
+  .player-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 4px; border-bottom:1px solid var(--navy-line);
+  }
+  .player-row:last-child{ border-bottom:none; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.08em;
+      text-transform:uppercase; color:var(--cream-dim); padding:8px 6px; border-bottom:1px solid var(--navy-line); }
+  td{ padding:8px 6px; border-bottom:1px solid var(--navy-line); }
+  tr.me{ background: rgba(232,114,44,0.07); }
+  .rank{ font-family:'Anton',sans-serif; font-size:20px; color:var(--orange); width:34px; display:inline-block;}
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+
+  .empty{ text-align:center; padding:40px 20px; color:var(--cream-dim); }
+  .empty .display{ font-size:22px; color:var(--cream); margin-bottom:6px; }
+
+  .switch-row{ display:flex; align-items:center; justify-content:space-between; padding:10px 0; }
+  .home-lg-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 16px; border:1px solid var(--navy-line); border-radius:4px; margin-bottom:8px; cursor:pointer;
+  }
+  .home-lg-item:hover{ border-color: var(--orange); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= CONFIG ================= */
+/* Fill these in from Supabase → Project Settings → API, then deploy.
+   See README.md for the full setup walkthrough. */
+const SUPABASE_URL = "https://mmcazhhyexanojaemgvi.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_h1hek74t7oFo9e3oLbPw6Q_ltpmeTxu";
+
+let supabase = null;
+if(!window.supabase || !window.supabase.createClient){
+  document.getElementById('app').innerHTML =
+    '<div style="max-width:480px;margin:80px auto;padding:24px;border:1px solid rgba(245,243,237,0.14);border-radius:6px;">'
+    + '<p style="font-family:monospace;color:#E8722C;font-size:11px;letter-spacing:0.16em;">CONNECTION ERROR</p>'
+    + '<h1 style="font-family:Anton,sans-serif;text-transform:uppercase;">Couldn\'t load</h1>'
+    + '<p style="color:#C9C4B6;">The database library failed to load — usually a network issue or an ad-blocker blocking the CDN. Refresh the page, and if it keeps happening, try a different network or disable blockers for this site.</p>'
+    + '</div>';
+} else if(SUPABASE_URL.startsWith("http")){
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+/* ================= STATE / STORAGE HELPERS ================= */
+let profile = null;          // {name}
+let currentLeague = null;    // full league object currently viewed
+let currentCode = null;
+let activeTab = 'overview';
+let myLeagues = [];          // [{code,name}]
+let pollTimer = null;
+let realtimeChannel = null;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function configMissing(){
+  return !supabase;
+}
+
+/* --- shared league data lives in Supabase (table: leagues, columns: code text pk, data jsonb) --- */
+async function getShared(code){
+  if(configMissing()){ toast('Supabase not configured yet — see README.md'); return null; }
+  const { data, error } = await supabase.from('leagues').select('data').eq('code', code).maybeSingle();
+  if(error){ console.error(error); toast('Could not reach the database'); return null; }
+  return data ? data.data : null;
+}
+async function setShared(code, val){
+  if(configMissing()){ toast('Supabase not configured yet — see README.md'); return false; }
+  const { error } = await supabase.from('leagues').upsert({ code, data: val, updated_at: new Date().toISOString() });
+  if(error){ console.error(error); toast('Could not save — try again'); return false; }
+  return true;
+}
+
+/* --- personal prefs (your name, your league list) live in this browser only --- */
+async function getPersonal(key){
+  try{ const v = localStorage.getItem('fh:'+key); return v ? JSON.parse(v) : null; }
+  catch(e){ return null; }
+}
+async function setPersonal(key, val){
+  try{ localStorage.setItem('fh:'+key, JSON.stringify(val)); return true; }
+  catch(e){ return false; }
+}
+
+function genCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for(let i=0;i<5;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+function defaultScoring(){
+  return {
+    points: 1, rebounds: 1.2, assists: 1.5,
+    advanced: false, threes: 0.5, steals: 2, blocks: 2, turnovers: -1
+  };
+}
+function newLeague(name, commish){
+  return {
+    code: genCode(),
+    name: name,
+    commissioner: commish,
+    createdAt: Date.now(),
+    scoring: defaultScoring(),
+    members: [{name: commish, joinedAt: Date.now()}],
+    players: [],           // {id, name, team}
+    draftOrder: [commish],
+    draftStatus: 'setup',  // setup | drafting | complete
+    pickIndex: 0,
+    picks: [],              // {playerId, member, pickNumber}
+    stats: {}                // playerId -> {points, rebounds, assists, threes, steals, blocks, turnovers}
+  };
+}
+
+/* ================= DRAFT LOGIC ================= */
+function turnMember(league){
+  const n = league.draftOrder.length;
+  if(n === 0) return null;
+  const round = Math.floor(league.pickIndex / n);
+  const posInRound = league.pickIndex % n;
+  const idx = (round % 2 === 0) ? posInRound : (n - 1 - posInRound);
+  return league.draftOrder[idx];
+}
+function availablePlayers(league){
+  const takenIds = new Set(league.picks.map(p=>p.playerId));
+  return league.players.filter(p=>!takenIds.has(p.id));
+}
+function rosterFor(league, member){
+  return league.picks.filter(p=>p.member===member).map(p=>league.players.find(pl=>pl.id===p.playerId)).filter(Boolean);
+}
+function fantasyPoints(league, playerId){
+  const s = league.stats[playerId];
+  if(!s) return 0;
+  const sc = league.scoring;
+  let total = (s.points||0)*sc.points + (s.rebounds||0)*sc.rebounds + (s.assists||0)*sc.assists;
+  if(sc.advanced){
+    total += (s.threes||0)*sc.threes + (s.steals||0)*sc.steals + (s.blocks||0)*sc.blocks + (s.turnovers||0)*sc.turnovers;
+  }
+  return Math.round(total*10)/10;
+}
+function leaderboard(league){
+  return league.members.map(m=>{
+    const roster = rosterFor(league, m.name);
+    const total = roster.reduce((sum,p)=>sum+fantasyPoints(league,p.id),0);
+    return {name:m.name, roster, total: Math.round(total*10)/10};
+  }).sort((a,b)=>b.total-a.total);
+}
+
+/* ================= RENDER ROOT ================= */
+async function boot(){
+  profile = await getPersonal('profile');
+  myLeagues = (await getPersonal('my-leagues')) || [];
+  render();
+}
+
+function render(){
+  if(!profile){ renderNameGate(); return; }
+  if(!currentLeague){ renderHome(); return; }
+  renderLeaguePage();
+}
+
+/* ================= NAME GATE ================= */
+function renderNameGate(){
+  stopPoll();
+  document.getElementById('app').innerHTML = `
+    <div style="min-height:70vh; display:flex; align-items:center; justify-content:center;">
+      <div class="card" style="max-width:420px; width:100%;">
+        <p class="eyebrow">Fantasy Hoops</p>
+        <h1 class="display" style="font-size:28px; margin:0 0 4px;">Who's picking?</h1>
+        <p class="muted" style="margin:0 0 20px;">Your name is how leaguemates will see you on the board.</p>
+        <div class="field">
+          <label>Your name</label>
+          <input id="nameInput" placeholder="e.g. Jordan" maxlength="24" />
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="submitName()">Continue</button>
+      </div>
+    </div>`;
+  document.getElementById('nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') submitName(); });
+  document.getElementById('nameInput').focus();
+}
+async function submitName(){
+  const v = document.getElementById('nameInput').value.trim();
+  if(!v){ toast('Enter a name first'); return; }
+  profile = {name: v};
+  await setPersonal('profile', profile);
+  render();
+}
+
+/* ================= HOME ================= */
+function renderHome(){
+  stopPoll();
+  const list = myLeagues.map(l=>`
+    <div class="home-lg-item" onclick="openLeague('${l.code}')">
+      <div>
+        <div style="font-weight:700;">${escapeHtml(l.name)}</div>
+        <div class="muted mono">${l.code}</div>
+      </div>
+      <span class="pill">Open →</span>
+    </div>`).join('') || `<p class="muted">No leagues yet — create one or join with a code.</p>`;
+
+  document.getElementById('app').innerHTML = `
+    <div class="scorebug row between wrap">
+      <div>
+        <p class="eyebrow">Signed in as</p>
+        <h1 class="display" style="font-size:26px; margin:0;">${escapeHtml(profile.name)}</h1>
+      </div>
+      <button class="btn btn-ghost" onclick="switchProfile()">Switch name</button>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <p class="eyebrow">Start fresh</p>
+        <h2 class="display" style="font-size:20px; margin:0 0 14px;">Create a league</h2>
+        <div class="field">
+          <label>League name</label>
+          <input id="newLeagueName" placeholder="e.g. Office Pool 2027" maxlength="40"/>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="createLeague()">Create league</button>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Have an invite?</p>
+        <h2 class="display" style="font-size:20px; margin:0 0 14px;">Join with a code</h2>
+        <div class="field">
+          <label>League code</label>
+          <input id="joinCode" placeholder="e.g. 7GQ4X" maxlength="6" style="text-transform:uppercase;"/>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="joinLeague()">Join league</button>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+    <p class="eyebrow">Your leagues</p>
+    ${list}
+  `;
+}
+async function switchProfile(){
+  profile = null;
+  await setPersonal('profile', null);
+  render();
+}
+async function createLeague(){
+  const name = document.getElementById('newLeagueName').value.trim();
+  if(!name){ toast('Give your league a name'); return; }
+  const league = newLeague(name, profile.name);
+  await setShared(league.code, league);
+  myLeagues.push({code:league.code, name:league.name});
+  await setPersonal('my-leagues', myLeagues);
+  toast('League created — share code '+league.code);
+  openLeague(league.code);
+}
+async function joinLeague(){
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!code){ toast('Enter a code'); return; }
+  const league = await getShared(code);
+  if(!league){ toast('No league found with that code'); return; }
+  if(!league.members.find(m=>m.name===profile.name)){
+    league.members.push({name:profile.name, joinedAt: Date.now()});
+    league.draftOrder.push(profile.name);
+    await setShared(code, league);
+  }
+  if(!myLeagues.find(l=>l.code===code)){
+    myLeagues.push({code:league.code, name:league.name});
+    await setPersonal('my-leagues', myLeagues);
+  }
+  toast('Joined '+league.name);
+  openLeague(code);
+}
+async function openLeague(code){
+  const league = await getShared(code);
+  if(!league){ toast('League not found'); return; }
+  currentCode = code;
+  currentLeague = league;
+  activeTab = 'overview';
+  render();
+  startPoll();
+}
+function backHome(){
+  stopPoll();
+  currentLeague = null; currentCode = null;
+  render();
+}
+
+/* ================= LIVE UPDATES: Supabase realtime + light polling fallback ================= */
+function startPoll(){
+  stopPoll();
+  if(supabase && currentCode){
+    realtimeChannel = supabase.channel('league-'+currentCode)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leagues', filter: `code=eq.${currentCode}` },
+        payload => {
+          if(!payload.new || !payload.new.data) return;
+          if(activeTab === 'settings' || activeTab === 'players' || activeTab === 'statentry') return; // don't clobber typing
+          currentLeague = payload.new.data;
+          render();
+        })
+      .subscribe();
+  }
+  // fallback poll in case realtime isn't reachable (e.g. blocked network)
+  pollTimer = setInterval(async ()=>{
+    if(!currentCode) return;
+    if(activeTab === 'settings' || activeTab === 'players' || activeTab === 'statentry') return;
+    const fresh = await getShared(currentCode);
+    if(fresh && JSON.stringify(fresh) !== JSON.stringify(currentLeague)){
+      currentLeague = fresh;
+      render();
+    }
+  }, 8000);
+}
+function stopPoll(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel=null; }
+}
+
+async function saveCurrentLeague(){
+  await setShared(currentCode, currentLeague);
+}
+
+/* ================= LEAGUE PAGE SHELL ================= */
+function isCommish(){ return currentLeague.commissioner === profile.name; }
+
+function renderLeaguePage(){
+  const L = currentLeague;
+  const tabs = [
+    ['overview','Overview'],
+    ['settings','Scoring'],
+    ['players','Player pool'],
+    ['draft','Draft'],
+    ['leaderboard','Leaderboard'],
+  ];
+  document.getElementById('app').innerHTML = `
+    <div class="scorebug">
+      <div class="row between wrap">
+        <div>
+          <p class="eyebrow" style="cursor:pointer;" onclick="backHome()">← All leagues</p>
+          <h1 class="display">${escapeHtml(L.name)}</h1>
+        </div>
+        <div style="text-align:right;">
+          <div class="code-badge" onclick="copyCode()" title="Click to copy">${L.code}</div>
+          <div class="muted" style="margin-top:6px;">${L.members.length} member${L.members.length===1?'':'s'} · ${L.draftStatus==='setup'?'Not started':L.draftStatus==='drafting'?'Drafting live':'Draft complete'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      ${tabs.map(([id,label])=>`<div class="tab ${activeTab===id?'active':''}" onclick="setTab('${id}')">${label}</div>`).join('')}
+    </div>
+    <div id="tabBody"></div>
+  `;
+  renderTabBody();
+}
+function setTab(id){ activeTab=id; renderTabBody(); if(id!=='settings'&&id!=='players'&&id!=='statentry'){ startPoll(); } }
+function renderTabBody(){
+  const el = document.getElementById('tabBody');
+  if(activeTab==='overview') el.innerHTML = tplOverview();
+  else if(activeTab==='settings') el.innerHTML = tplSettings();
+  else if(activeTab==='players') el.innerHTML = tplPlayers();
+  else if(activeTab==='draft') el.innerHTML = tplDraft();
+  else if(activeTab==='leaderboard') el.innerHTML = tplLeaderboard();
+  else if(activeTab==='statentry') el.innerHTML = tplStatEntry();
+}
+async function copyCode(){
+  try{ await navigator.clipboard.writeText(currentLeague.code); toast('Code copied — send it to your league'); }
+  catch(e){ toast('Code: '+currentLeague.code); }
+}
+
+/* ---------------- OVERVIEW ---------------- */
+function tplOverview(){
+  const L = currentLeague;
+  const membersList = L.members.map(m=>`
+    <div class="player-row">
+      <div class="row">
+        <span style="font-weight:700;">${escapeHtml(m.name)}</span>
+        ${m.name===L.commissioner?'<span class="pill">Commissioner</span>':''}
+        ${m.name===profile.name?'<span class="pill pill-live">You</span>':''}
+      </div>
+      <span class="muted mono">${rosterFor(L,m.name).length} drafted</span>
+    </div>`).join('');
+
+  let cta = '';
+  if(L.draftStatus==='setup'){
+    cta = isCommish()
+      ? `<div class="card" style="margin-top:16px;">
+           <p class="eyebrow">Next step</p>
+           <p style="margin:0 0 14px;">Add players to the pool, check your scoring settings, then start the draft when everyone's joined.</p>
+           <button class="btn btn-primary" onclick="setTab('players')">Go to player pool</button>
+         </div>`
+      : `<div class="card" style="margin-top:16px;"><p class="muted">Waiting on the commissioner (${escapeHtml(L.commissioner)}) to set up the player pool and start the draft.</p></div>`;
+  } else if(L.draftStatus==='drafting'){
+    const t = turnMember(L);
+    cta = `<div class="card" style="margin-top:16px;">
+      <p class="eyebrow">Draft is live</p>
+      <p style="margin:0 0 14px;">On the clock: <strong style="color:var(--orange)">${escapeHtml(t)}</strong> · Pick ${L.pickIndex+1}</p>
+      <button class="btn btn-primary" onclick="setTab('draft')">Go to draft room</button>
+    </div>`;
+  } else {
+    cta = `<div class="card" style="margin-top:16px;">
+      <p class="eyebrow">Draft complete</p>
+      <button class="btn btn-primary" onclick="setTab('leaderboard')">View leaderboard</button>
+    </div>`;
+  }
+
+  return `
+    <div class="card">
+      <p class="eyebrow">Invite others</p>
+      <p class="muted" style="margin:0 0 10px;">Share this code — they enter it under "Join with a code" after typing in their own name.</p>
+      <div class="code-badge" onclick="copyCode()" style="font-size:18px; padding:8px 16px;">${currentLeague.code}</div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <p class="eyebrow">Members</p>
+      ${membersList}
+    </div>
+    ${cta}
+  `;
+}
+
+/* ---------------- SETTINGS (scoring) ---------------- */
+function tplSettings(){
+  const L = currentLeague;
+  const locked = L.draftStatus !== 'setup';
+  const sc = L.scoring;
+  if(!isCommish()){
+    return `<div class="card"><p class="muted">Only the commissioner (${escapeHtml(L.commissioner)}) can edit scoring. Here's the current setup:</p>
+      ${scoringReadout(sc)}
+    </div>`;
+  }
+  return `
+    <div class="card">
+      <p class="eyebrow">Scoring settings</p>
+      <p class="muted" style="margin:0 0 18px;">Points per stat. ${locked?'Locked once the draft starts.':'You can change these until the draft begins.'}</p>
+      <div class="grid2">
+        <div class="field"><label>Per point scored</label><input type="number" step="0.1" id="scPoints" value="${sc.points}" ${locked?'disabled':''}></div>
+        <div class="field"><label>Per rebound</label><input type="number" step="0.1" id="scRebounds" value="${sc.rebounds}" ${locked?'disabled':''}></div>
+        <div class="field"><label>Per assist</label><input type="number" step="0.1" id="scAssists" value="${sc.assists}" ${locked?'disabled':''}></div>
+      </div>
+      <div class="switch-row">
+        <span style="font-weight:600; font-size:14px;">Advanced categories (steals, blocks, 3PM, turnovers)</span>
+        <input type="checkbox" id="scAdvanced" ${sc.advanced?'checked':''} ${locked?'disabled':''} onchange="toggleAdvanced()" style="width:auto;">
+      </div>
+      <div id="advancedFields" style="${sc.advanced?'':'display:none;'}">
+        <div class="grid2" style="margin-top:8px;">
+          <div class="field"><label>Per 3-pointer made</label><input type="number" step="0.1" id="scThrees" value="${sc.threes}" ${locked?'disabled':''}></div>
+          <div class="field"><label>Per steal</label><input type="number" step="0.1" id="scSteals" value="${sc.steals}" ${locked?'disabled':''}></div>
+          <div class="field"><label>Per block</label><input type="number" step="0.1" id="scBlocks" value="${sc.blocks}" ${locked?'disabled':''}></div>
+          <div class="field"><label>Per turnover</label><input type="number" step="0.1" id="scTurnovers" value="${sc.turnovers}" ${locked?'disabled':''}></div>
+        </div>
+      </div>
+      ${locked?'':'<button class="btn btn-primary" onclick="saveScoring()">Save scoring</button>'}
+    </div>
+  `;
+}
+function scoringReadout(sc){
+  let rows = `<div class="player-row"><span>Points</span><span class="mono">${sc.points}</span></div>
+              <div class="player-row"><span>Rebounds</span><span class="mono">${sc.rebounds}</span></div>
+              <div class="player-row"><span>Assists</span><span class="mono">${sc.assists}</span></div>`;
+  if(sc.advanced){
+    rows += `<div class="player-row"><span>3-pointers made</span><span class="mono">${sc.threes}</span></div>
+             <div class="player-row"><span>Steals</span><span class="mono">${sc.steals}</span></div>
+             <div class="player-row"><span>Blocks</span><span class="mono">${sc.blocks}</span></div>
+             <div class="player-row"><span>Turnovers</span><span class="mono">${sc.turnovers}</span></div>`;
+  }
+  return rows;
+}
+function toggleAdvanced(){
+  const on = document.getElementById('scAdvanced').checked;
+  document.getElementById('advancedFields').style.display = on ? '' : 'none';
+}
+async function saveScoring(){
+  const L = currentLeague;
+  L.scoring = {
+    points: parseFloat(document.getElementById('scPoints').value)||0,
+    rebounds: parseFloat(document.getElementById('scRebounds').value)||0,
+    assists: parseFloat(document.getElementById('scAssists').value)||0,
+    advanced: document.getElementById('scAdvanced').checked,
+    threes: parseFloat(document.getElementById('scThrees').value)||0,
+    steals: parseFloat(document.getElementById('scSteals').value)||0,
+    blocks: parseFloat(document.getElementById('scBlocks').value)||0,
+    turnovers: parseFloat(document.getElementById('scTurnovers').value)||0,
+  };
+  await saveCurrentLeague();
+  toast('Scoring saved');
+}
+
+/* ---------------- PLAYER POOL ---------------- */
+function tplPlayers(){
+  const L = currentLeague;
+  const rows = L.players.map(p=>`
+    <div class="player-row">
+      <div><strong>${escapeHtml(p.name)}</strong> <span class="muted">— ${escapeHtml(p.team)}</span></div>
+      ${isCommish() && L.draftStatus==='setup' ? `<button class="btn btn-danger" style="padding:4px 10px; font-size:12px;" onclick="removePlayer('${p.id}')">Remove</button>` : ''}
+    </div>`).join('') || `<p class="muted">No players added yet.</p>`;
+
+  const adminBlock = isCommish() ? `
+    <div class="card" style="margin-top:16px;">
+      <p class="eyebrow">Add a player</p>
+      <div class="grid2">
+        <div class="field"><label>Player name</label><input id="pName" placeholder="e.g. Cooper Flagg"></div>
+        <div class="field"><label>Team</label><input id="pTeam" placeholder="e.g. Duke"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addPlayer()" ${L.draftStatus!=='setup'?'disabled':''}>Add player</button>
+      <div class="hr"></div>
+      <p class="eyebrow">Bulk add</p>
+      <p class="muted" style="margin:0 0 8px;">One per line: <span class="mono">Player Name, Team</span></p>
+      <textarea id="bulkPaste" rows="5" placeholder="Cooper Flagg, Duke&#10;JJ Redick Jr, UConn"></textarea>
+      <div style="height:10px;"></div>
+      <button class="btn btn-ghost" onclick="bulkAdd()" ${L.draftStatus!=='setup'?'disabled':''}>Import list</button>
+      <div class="hr"></div>
+      ${L.draftStatus==='setup' ? `
+        <p class="eyebrow">Ready to draft?</p>
+        <p class="muted" style="margin:0 0 12px;">${L.players.length} players in the pool · ${L.draftOrder.length} members in draft order.</p>
+        <button class="btn btn-primary" onclick="setTab('draftorder')" style="margin-right:8px;">Set draft order</button>
+        <button class="btn btn-primary" onclick="startDraft()" ${L.players.length<L.draftOrder.length?'disabled':''}>Start draft</button>
+        ${L.players.length<L.draftOrder.length?'<p class="muted" style="margin-top:8px;">Add more players than members before starting.</p>':''}
+      ` : ''}
+    </div>` : '';
+
+  return `
+    <div class="card">
+      <p class="eyebrow">Available player pool (${L.players.length})</p>
+      ${rows}
+    </div>
+    ${adminBlock}
+    ${activeTab==='draftorder' ? '' : ''}
+  `;
+}
+async function addPlayer(){
+  const name = document.getElementById('pName').value.trim();
+  const team = document.getElementById('pTeam').value.trim();
+  if(!name||!team){ toast('Enter a name and team'); return; }
+  currentLeague.players.push({id: uid(), name, team});
+  await saveCurrentLeague();
+  toast('Player added');
+  renderTabBody();
+}
+async function bulkAdd(){
+  const raw = document.getElementById('bulkPaste').value.trim();
+  if(!raw){ return; }
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  let count=0;
+  for(const line of lines){
+    const parts = line.split(',');
+    if(parts.length>=2){
+      currentLeague.players.push({id: uid(), name: parts[0].trim(), team: parts.slice(1).join(',').trim()});
+      count++;
+    }
+  }
+  await saveCurrentLeague();
+  toast(count+' players imported');
+  renderTabBody();
+}
+async function removePlayer(id){
+  currentLeague.players = currentLeague.players.filter(p=>p.id!==id);
+  await saveCurrentLeague();
+  renderTabBody();
+}
+
+/* ---------------- DRAFT ORDER (mini view inside players tab flow) ---------------- */
+function tplDraftOrder(){
+  const L = currentLeague;
+  const items = L.draftOrder.map((name,i)=>`
+    <div class="player-row">
+      <span><span class="mono muted">${i+1}.</span> ${escapeHtml(name)}</span>
+      <span class="row">
+        <button class="btn btn-ghost" style="padding:4px 8px;" onclick="moveOrder(${i},-1)">↑</button>
+        <button class="btn btn-ghost" style="padding:4px 8px;" onclick="moveOrder(${i},1)">↓</button>
+      </span>
+    </div>`).join('');
+  return `
+    <div class="card">
+      <p class="eyebrow">Draft order</p>
+      <p class="muted" style="margin:0 0 12px;">Snake format — order reverses each round.</p>
+      ${items}
+      <div class="hr"></div>
+      <button class="btn btn-ghost" onclick="shuffleOrder()">Randomize order</button>
+      <button class="btn btn-primary" onclick="setTab('players')" style="margin-left:8px;">Done</button>
+    </div>`;
+}
+async function moveOrder(i, dir){
+  const L = currentLeague;
+  const j = i+dir;
+  if(j<0||j>=L.draftOrder.length) return;
+  [L.draftOrder[i], L.draftOrder[j]] = [L.draftOrder[j], L.draftOrder[i]];
+  await saveCurrentLeague();
+  renderTabBody();
+}
+async function shuffleOrder(){
+  const L = currentLeague;
+  for(let i=L.draftOrder.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [L.draftOrder[i],L.draftOrder[j]] = [L.draftOrder[j],L.draftOrder[i]];
+  }
+  await saveCurrentLeague();
+  renderTabBody();
+}
+async function startDraft(){
+  const L = currentLeague;
+  if(L.players.length < L.draftOrder.length){ toast('Add more players first'); return; }
+  L.draftStatus = 'drafting';
+  L.pickIndex = 0;
+  await saveCurrentLeague();
+  activeTab='draft';
+  renderLeaguePage();
+  startPoll();
+}
+
+/* patch tab body to support draftorder pseudo-tab */
+const _origRenderTabBody = renderTabBody;
+renderTabBody = function(){
+  if(activeTab==='draftorder'){ document.getElementById('tabBody').innerHTML = tplDraftOrder(); return; }
+  _origRenderTabBody();
+};
+
+/* ---------------- DRAFT ROOM ---------------- */
+function tplDraft(){
+  const L = currentLeague;
+  if(L.draftStatus==='setup'){
+    return `<div class="empty"><div class="display">Draft hasn't started</div><p>The commissioner needs to set up the player pool first.</p></div>`;
+  }
+  const avail = availablePlayers(L);
+  const onClock = turnMember(L);
+  const myTurn = onClock === profile.name;
+
+  if(L.draftStatus==='complete'){
+    return `<div class="empty"><div class="display">Draft complete 🏆</div><p>Head to the leaderboard to see how everyone's doing.</p><button class="btn btn-primary" onclick="setTab('leaderboard')">View leaderboard</button></div>`;
+  }
+
+  const commishOverride = isCommish() ? `
+    <div class="row" style="margin-top:8px;">
+      <span class="muted" style="font-size:12px;">Pick on behalf of:</span>
+      <select id="overrideSelect" style="width:auto;">
+        ${L.draftOrder.map(n=>`<option ${n===onClock?'selected':''}>${escapeHtml(n)}</option>`).join('')}
+      </select>
+    </div>` : '';
+
+  const poolRows = avail.map(p=>`
+    <div class="player-row">
+      <div><strong>${escapeHtml(p.name)}</strong> <span class="muted">— ${escapeHtml(p.team)}</span></div>
+      <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;"
+        onclick="draftPlayer('${p.id}')" ${(!myTurn && !isCommish())?'disabled':''}>Draft</button>
+    </div>`).join('') || `<p class="muted">All players drafted.</p>`;
+
+  const board = L.picks.slice().reverse().map(pk=>{
+    const pl = L.players.find(x=>x.id===pk.playerId);
+    return `<div class="ticket">
+      <div class="pk">PICK ${pk.pickNumber+1}</div>
+      <div class="pname">${escapeHtml(pl?pl.name:'—')}</div>
+      <div class="pteam">${escapeHtml(pl?pl.team:'')}</div>
+      <div class="pby">DRAFTED BY ${escapeHtml(pk.member).toUpperCase()}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="clock">
+      <div>
+        <p class="eyebrow" style="margin:0;">On the clock</p>
+        <div class="onclock display">${escapeHtml(onClock)}</div>
+        ${commishOverride}
+      </div>
+      <div style="text-align:right;">
+        <p class="eyebrow" style="margin:0;">Pick</p>
+        <div class="display" style="font-size:26px;">${L.pickIndex+1}</div>
+      </div>
+    </div>
+    ${myTurn ? `<p class="muted" style="margin:0 0 10px;">It's your pick — choose a player below.</p>` : `<p class="muted" style="margin:0 0 10px;">Waiting on ${escapeHtml(onClock)}...</p>`}
+    <div class="card">
+      <p class="eyebrow">Available players (${avail.length})</p>
+      <div style="max-height:340px; overflow-y:auto;">${poolRows}</div>
+    </div>
+    ${board ? `<div class="hr"></div><p class="eyebrow">Draft board</p><div class="ticket-grid">${board}</div>` : ''}
+  `;
+}
+async function draftPlayer(playerId){
+  const L = currentLeague;
+  const onClock = turnMember(L);
+  let member = onClock;
+  if(isCommish()){
+    const sel = document.getElementById('overrideSelect');
+    if(sel) member = sel.value;
+  } else if(profile.name !== onClock){
+    toast("It's not your pick");
+    return;
+  }
+  L.picks.push({playerId, member, pickNumber: L.pickIndex});
+  L.pickIndex += 1;
+  if(availablePlayers(L).length === 0 || L.pickIndex >= L.draftOrder.length * Math.floor(L.players.length/L.draftOrder.length)){
+    if(availablePlayers(L).length === 0) L.draftStatus = 'complete';
+  }
+  await saveCurrentLeague();
+  toast('Drafted!');
+  renderTabBody();
+  renderLeaguePage();
+}
+
+/* ---------------- LEADERBOARD ---------------- */
+function tplLeaderboard(){
+  const L = currentLeague;
+  const board = leaderboard(L);
+  const rows = board.map((b,i)=>`
+    <tr class="${b.name===profile.name?'me':''}">
+      <td><span class="rank">${i+1}</span></td>
+      <td><strong>${escapeHtml(b.name)}</strong><br><span class="muted" style="font-size:11px;">${b.roster.map(p=>escapeHtml(p.name)).join(', ')||'No picks'}</span></td>
+      <td class="mono" style="text-align:right; font-size:18px;">${b.total}</td>
+    </tr>`).join('');
+
+  const statAdmin = isCommish() ? `
+    <div class="card" style="margin-top:16px;">
+      <p class="eyebrow">Commissioner tools</p>
+      <p class="muted" style="margin:0 0 12px;">Enter live tournament stats to update scores.</p>
+      <button class="btn btn-primary" onclick="setTab('statentry')">Enter player stats</button>
+    </div>` : '';
+
+  return `
+    <div class="card">
+      <p class="eyebrow">Standings</p>
+      <table>
+        <thead><tr><th></th><th>Manager</th><th style="text-align:right;">Fantasy pts</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" class="muted">No members yet</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${statAdmin}
+  `;
+}
+
+/* ---------------- STAT ENTRY (commissioner) ---------------- */
+function tplStatEntry(){
+  const L = currentLeague;
+  if(!isCommish()) return `<p class="muted">Only the commissioner can enter stats.</p>`;
+  const rows = L.players.map(p=>{
+    const s = L.stats[p.id] || {points:0,rebounds:0,assists:0,threes:0,steals:0,blocks:0,turnovers:0};
+    return `
+    <div class="card" style="margin-bottom:10px;">
+      <div class="row between" style="margin-bottom:10px;">
+        <strong>${escapeHtml(p.name)}</strong><span class="muted">${escapeHtml(p.team)}</span>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Points</label><input type="number" id="st_${p.id}_points" value="${s.points}"></div>
+        <div class="field"><label>Rebounds</label><input type="number" id="st_${p.id}_rebounds" value="${s.rebounds}"></div>
+        <div class="field"><label>Assists</label><input type="number" id="st_${p.id}_assists" value="${s.assists}"></div>
+        ${L.scoring.advanced ? `
+          <div class="field"><label>3PM</label><input type="number" id="st_${p.id}_threes" value="${s.threes}"></div>
+          <div class="field"><label>Steals</label><input type="number" id="st_${p.id}_steals" value="${s.steals}"></div>
+          <div class="field"><label>Blocks</label><input type="number" id="st_${p.id}_blocks" value="${s.blocks}"></div>
+          <div class="field"><label>Turnovers</label><input type="number" id="st_${p.id}_turnovers" value="${s.turnovers}"></div>
+        `:''}
+      </div>
+    </div>`;
+  }).join('') || `<p class="muted">No players in the pool.</p>`;
+
+  return `
+    <p class="eyebrow">Cumulative tournament stat totals</p>
+    <p class="muted" style="margin:0 0 14px;">Update these as games happen — the leaderboard recalculates automatically.</p>
+    ${rows}
+    <button class="btn btn-primary" onclick="saveStats()">Save stats</button>
+    <button class="btn btn-ghost" onclick="setTab('leaderboard')" style="margin-left:8px;">Back to leaderboard</button>
+  `;
+}
+async function saveStats(){
+  const L = currentLeague;
+  for(const p of L.players){
+    L.stats[p.id] = {
+      points: parseFloat(document.getElementById(`st_${p.id}_points`).value)||0,
+      rebounds: parseFloat(document.getElementById(`st_${p.id}_rebounds`).value)||0,
+      assists: parseFloat(document.getElementById(`st_${p.id}_assists`).value)||0,
+      threes: L.scoring.advanced ? (parseFloat(document.getElementById(`st_${p.id}_threes`).value)||0) : (L.stats[p.id]?.threes||0),
+      steals: L.scoring.advanced ? (parseFloat(document.getElementById(`st_${p.id}_steals`).value)||0) : (L.stats[p.id]?.steals||0),
+      blocks: L.scoring.advanced ? (parseFloat(document.getElementById(`st_${p.id}_blocks`).value)||0) : (L.stats[p.id]?.blocks||0),
+      turnovers: L.scoring.advanced ? (parseFloat(document.getElementById(`st_${p.id}_turnovers`).value)||0) : (L.stats[p.id]?.turnovers||0),
+    };
+  }
+  await saveCurrentLeague();
+  toast('Stats saved — leaderboard updated');
+  setTab('leaderboard');
+}
+
+/* ================= UTIL ================= */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+if(window.supabase && window.supabase.createClient){ boot(); }
+</script>
+</body>
+</html>
